@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
  
@@ -77,22 +80,103 @@ void setup(char inputBuffer[], char *args[],int *background)
 	for (i = 0; i <= ct; i++)
 		printf("args %d = %s\n",i,args[i]);
 } /* end of setup routine */
+
+
+char** split_paths(const char *str, const char *splitter, int *num_of_paths){
+    char *copy_all_paths = strdup(str);
+
+    // Find number of paths inside
+    int count = 0;
+    char *path_token = strtok(copy_all_paths, splitter);
+    while (path_token != NULL) {
+        count++;
+        path_token = strtok(NULL, splitter);
+    }
+
+    // Memory allocation for path array
+    char **paths = (char**)malloc(count * sizeof(char*));
+
+    strcpy(copy_all_paths, str); 
+
+    path_token = strtok(copy_all_paths, splitter);
+    for (int i = 0; i < count; i++) {
+        paths[i] = strdup(path_token);
+        path_token = strtok(NULL, splitter);
+    }
+
+    *num_of_paths = count;
+
+    free(copy_all_paths); // free the copy variable's allocated memory 
+
+     return paths;
+
+}
+
+
+
+int createProcess(char **PATH, int number_of_paths ,char **args, int *background){
+        int execv_return_val = 0;
+
+        pid_t pid = fork();
+
+        if (pid == -1) {
+            perror("Failed to fork\n");
+        }
+        if (pid == 0){ // child process
+
+            char *temp_path = (char *)malloc(strlen("/") + strlen(args[0]) + 1);
+
+            strcpy(temp_path, "/");
+            strcat(temp_path, args[0]);
+
+            for(int i = 0; i < number_of_paths; i++){
+                strcat(PATH[i], temp_path);
+                args[0] = PATH[i];
+                execv_return_val = execv(PATH[i], args);
+                usleep(350);
+            }
+        } 
+        else { // parent process
+            if(background){
+                return 0; // backgroundsa çıkar beklemez
+            }else{
+                wait(NULL); // background değilse childlarını bekliyor
+            }
+        }
+    return execv_return_val;
+}
+
  
 int main(void)
 {
             char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
             int background; /* equals 1 if a command is followed by '&' */
             char *args[MAX_LINE/2 + 1]; /*command line arguments */
-            while (1){
+            //char *PATH; // path sonradan doldurulacak
+            while (1){  
+                        char *PATH = getenv("PATH");
+                        // printf("%s", PATH);
                         background = 0;
                         printf("myshell: ");
                         /*setup() calls exit() when Control-D is entered */
                         setup(inputBuffer, args, &background);
-                       
+                        int number_of_paths = 0;
+                        char splitter = ':';
+                        char** paths = split_paths(PATH, &splitter, &number_of_paths);
+            
+                        createProcess(paths, number_of_paths, args, &background);
+
+
+                        
                         /** the steps are:
                         (1) fork a child process using fork()
                         (2) the child process will invoke execv()
 						(3) if background == 0, the parent will wait,
                         otherwise it will invoke the setup() function again. */
+
+                        
+
             }
+
+                                    
 }
