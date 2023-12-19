@@ -3,7 +3,12 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+
+#define CREATE_FLAGS (O_WRONLY | O_CREAT | O_APPEND)
+//#define CREATE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
  
@@ -11,6 +16,13 @@
 in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
+
+struct bookmark
+{
+    char *data;
+    struct bookmark* next;    
+};
+
 
 void setup(char inputBuffer[], char *args[],int *background)
 {
@@ -146,6 +158,27 @@ int createProcess(char **PATH, int number_of_paths ,char **args, int *background
     return execv_return_val;
 }
 
+
+struct bookmark* insertNode(struct bookmark* head, char* newData) {
+    // Create a new node
+    struct bookmark* newBookmark = (struct bookmark*)malloc(sizeof(struct bookmark));
+
+    // Check if memory allocation is successful
+    if (newBookmark == NULL) {
+        printf("Memory allocation failed.\n");
+        return head;
+    }
+
+    // Initialize the new node
+    newBookmark->data = newData;
+    newBookmark->next = head;
+
+    // Update the head to point to the new node
+    head = newBookmark;
+
+    return head;
+}
+
  
 int main(void)
 {
@@ -160,12 +193,105 @@ int main(void)
                         printf("myshell: ");
                         /*setup() calls exit() when Control-D is entered */
                         setup(inputBuffer, args, &background);
+
+                        // ********bookmark*********
+
+
+                        if(!strcmp(args[0], "bookmark")){
+                            if(args[1] == "i"){
+
+                            }else if (args[1] == "d")
+                            {
+                                
+                            }else if(args[1] == "l"){
+
+                            }else{
+
+                            }
+                            
+
+                        }
+
+
+
+
                         int number_of_paths = 0;
                         char splitter = ':';
                         char** paths = split_paths(PATH, &splitter, &number_of_paths);
-            
-                        createProcess(paths, number_of_paths, args, &background);
 
+                        int fd;
+                        int i = 0;
+                        int argument_length = 0;
+                        int isRedirection = 0;  
+                        while(args[i] != NULL){
+
+                            printf("args: %s\n", args[i]);
+                            if(!strcmp(args[i], ">")){
+                                printf("args2: %s", args[2]);
+                                fd = open(args[2],CREATE_FLAGS, 0777);
+                                argument_length = i;
+                                isRedirection = 1;
+                                break;
+                            }
+                            else if(!strcmp(args[i], ">>")){
+                                fd = open(args[2],CREATE_FLAGS, 0777);
+                                argument_length = i;
+                                isRedirection = 1;
+                                break;
+                            }
+                            else if(!strcmp(args[i], "<")){
+                                fd = open(args[2], CREATE_FLAGS, 0777);
+                                argument_length = i;
+                                isRedirection = 1;
+                                break;
+                            }
+                            else if(!strcmp(args[i], "2>")){
+                                fd = open(args[2], CREATE_FLAGS, 0777);
+                                argument_length = i;
+                                isRedirection = 1;
+                                break;
+                            }
+                            i++;
+                        }
+
+                        printf("isRed: %d\n", isRedirection);
+
+                       if(isRedirection){
+                            printf("aaa\n");
+
+                            const char *arg_copy[argument_length + 1];
+                            memcpy(arg_copy, args, (argument_length + 1) * sizeof(char*));
+                            
+                            printf("aaa2\n");
+
+                            if (fd == -1) {
+                                perror("Failed to open my.file");
+                                return 1;
+                            }
+                            printf("aaa3\n");
+
+                            if (dup2(fd, STDOUT_FILENO) == -1) {
+                                perror("Failed to redirect standard output");
+                                return 1;
+                            }else{
+                                printf("redirection operation");
+                            }
+                            printf("aaa4\n");
+                            
+                     
+                        createProcess(paths, number_of_paths,arg_copy , &background);
+                       }
+                       else{
+                        createProcess(paths, number_of_paths, args, &background);
+                       }
+                        printf("after creat");
+
+                        if (close(fd) == -1) {
+                            perror("Failed to close the file");
+                            return 1;
+                        }
+                            
+                        
 
                         
                         /** the steps are:
@@ -173,7 +299,7 @@ int main(void)
                         (2) the child process will invoke execv()
 						(3) if background == 0, the parent will wait,
                         otherwise it will invoke the setup() function again. */
-
+                        
                         
 
             }
