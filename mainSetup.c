@@ -17,11 +17,84 @@ in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
 
-struct bookmark
-{
-    char *data;
-    struct bookmark* next;    
+struct Bookmark{
+    char *name;
+    struct Bookmark* next;    
 };
+
+
+struct Bookmark* createBookmark(const char* name) {
+    struct Bookmark* newBookmark = (struct Bookmark*)malloc(sizeof(struct Bookmark));
+    newBookmark->name = strdup(name);
+    newBookmark->next = NULL;
+    return newBookmark;
+}
+
+void insertBookmark(struct Bookmark** head, const char* name) {
+    struct Bookmark* newBookmark = createBookmark(name);
+
+    if (*head == NULL) {
+        *head = newBookmark;
+        return;
+    }
+
+    struct Bookmark* current = *head;
+    while (current->next != NULL) {
+        current = current->next;
+    }
+
+    current->next = newBookmark;
+}
+
+void deleteBookmark(struct Bookmark** head, const char* name) {
+    struct Bookmark* current = *head;
+    struct Bookmark* prev = NULL;
+
+    while (current != NULL && strcmp(current->name, name) != 0) {
+        prev = current;
+        current = current->next;
+    }
+
+    if (current == NULL) {
+        printf("Bookmark '%s' not found.\n", name);
+        return;
+    }
+
+    if (prev != NULL) {
+        prev->next = current->next;
+    } else {
+        *head = current->next;
+    }
+
+    free(current->name);
+    free(current);
+
+    printf("Bookmark '%s' deleted.\n", name);
+}
+
+void listBookmarks(struct Bookmark* head) {
+    if (head == NULL) {
+        printf("No bookmarks found.\n");
+        return;
+    }
+
+    printf("Bookmarks:\n");
+    while (head != NULL) {
+        printf("%s\n", head->name);
+        head = head->next;
+    }
+}
+
+void freeBookmarks(struct Bookmark** head) {
+    struct Bookmark* current = *head;
+    while (current != NULL) {
+        struct Bookmark* temp = current;
+        current = current->next;
+        free(temp->name);
+        free(temp);
+    }
+    *head = NULL;
+}
 
 
 void setup(char inputBuffer[], char *args[],int *background)
@@ -157,28 +230,6 @@ int createProcess(char **PATH, int number_of_paths ,char **args, int *background
         }
     return execv_return_val;
 }
-
-
-struct bookmark* insertNode(struct bookmark* head, char* newData) {
-    // Create a new node
-    struct bookmark* newBookmark = (struct bookmark*)malloc(sizeof(struct bookmark));
-
-    // Check if memory allocation is successful
-    if (newBookmark == NULL) {
-        printf("Memory allocation failed.\n");
-        return head;
-    }
-
-    // Initialize the new node
-    newBookmark->data = newData;
-    newBookmark->next = head;
-
-    // Update the head to point to the new node
-    head = newBookmark;
-
-    return head;
-}
-
  
 int main(void)
 {
@@ -280,16 +331,17 @@ int main(void)
                             
                      
                         createProcess(paths, number_of_paths,arg_copy , &background);
+                       if (close(fd) == -1) {
+                            perror("Failed to close the file");
+                            return 1;
+                        }
                        }
                        else{
                         createProcess(paths, number_of_paths, args, &background);
                        }
                         printf("after creat");
 
-                        if (close(fd) == -1) {
-                            perror("Failed to close the file");
-                            return 1;
-                        }
+                        
                             
                         
 
