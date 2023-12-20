@@ -30,15 +30,15 @@ struct Bookmark* createBookmark(const char* name) {
     return newBookmark;
 }
 
-void insertBookmark(struct Bookmark** head, const char* name) {
-    struct Bookmark* newBookmark = createBookmark(name);
+void insertBookmark(struct Bookmark **head, const char *name) {
+    struct Bookmark *newBookmark = createBookmark(name);
 
     if (*head == NULL) {
         *head = newBookmark;
         return;
     }
 
-    struct Bookmark* current = *head;
+    struct Bookmark *current = *head;
     while (current->next != NULL) {
         current = current->next;
     }
@@ -46,17 +46,37 @@ void insertBookmark(struct Bookmark** head, const char* name) {
     current->next = newBookmark;
 }
 
-void deleteBookmark(struct Bookmark** head, const char* name) {
-    struct Bookmark* current = *head;
-    struct Bookmark* prev = NULL;
+struct Bookmark *getBookmarkByIndex(struct Bookmark *head, int index) {
+    int currentIndex = 0;
+    while (head != NULL) {
+        if (currentIndex == index) {
+            return head;
+        }
+        head = head->next;
+        currentIndex++;
+    }
+    return NULL; // Index out of bounds
+}
 
-    while (current != NULL && strcmp(current->name, name) != 0) {
+
+void deleteBookmark(struct Bookmark **head, int index) {
+    if (*head == NULL) {
+        printf("No bookmarks found.\n");
+        return;
+    }
+
+    struct Bookmark *current = *head;
+    struct Bookmark *prev = NULL;
+    int currentIndex = 0;
+
+    while (current != NULL && currentIndex < index) {
         prev = current;
         current = current->next;
+        currentIndex++;
     }
 
     if (current == NULL) {
-        printf("Bookmark '%s' not found.\n", name);
+        printf("Index %d is out of bounds.\n", index);
         return;
     }
 
@@ -69,7 +89,7 @@ void deleteBookmark(struct Bookmark** head, const char* name) {
     free(current->name);
     free(current);
 
-    printf("Bookmark '%s' deleted.\n", name);
+    printf("Bookmark at index %d deleted.\n", index);
 }
 
 void listBookmarks(struct Bookmark* head) {
@@ -85,16 +105,6 @@ void listBookmarks(struct Bookmark* head) {
     }
 }
 
-void freeBookmarks(struct Bookmark** head) {
-    struct Bookmark* current = *head;
-    while (current != NULL) {
-        struct Bookmark* temp = current;
-        current = current->next;
-        free(temp->name);
-        free(temp);
-    }
-    *head = NULL;
-}
 
 
 void setup(char inputBuffer[], char *args[],int *background)
@@ -237,6 +247,8 @@ int main(void)
             int background; /* equals 1 if a command is followed by '&' */
             char *args[MAX_LINE/2 + 1]; /*command line arguments */
             //char *PATH; // path sonradan doldurulacak
+            struct Bookmark* bookmarks = NULL;
+
             while (1){  
                         char *PATH = getenv("PATH");
                         // printf("%s", PATH);
@@ -246,23 +258,51 @@ int main(void)
                         setup(inputBuffer, args, &background);
 
                         // ********bookmark*********
-
-
                         if(!strcmp(args[0], "bookmark")){
-                            if(args[1] == "i"){
-
-                            }else if (args[1] == "d")
-                            {
-                                
-                            }else if(args[1] == "l"){
-
-                            }else{
-
+                            if(!strcmp(args[1], "-i")){
+                                // execute
+                                // create process eklenecek
+                                int value = atoi(args[2]);
+                                if(!value){
+                                    if(strcmp(args[2], "0")){
+                                        printf("You must enter a valid number.");
+                                        continue;
+                                    }
+                                }
+                                struct Bookmark *neededBookmark = getBookmarkByIndex(bookmarks, value);
+                                //TODO: execution will be added
                             }
-                            
+                            else if (!strcmp(args[1], "-d")){
+                                // delete
+                                int value = atoi(args[2]);
+                                if(!value){
+                                    if(strcmp(args[2], "0")){
+                                        printf("You must enter a valid number.");
+                                        continue;
+                                    }
+                                }
+                                deleteBookmark(&bookmarks, value);
+                            }
+                            else if(!strcmp(args[1], "-l")){
+                                // list
+                                listBookmarks(bookmarks);
+                            }
+                            else if(*args[1] == '"')
+                            {
+                                char *command = args[1];
+                                int count = 2;
+                                while(args[count] != NULL){
+                                    char* result = (char*)malloc(strlen(args[count]) + strlen(command) + 2);
+                                    strcpy(result, command);
+                                    strcat(result, " ");
+                                    strcat(result, args[count]);
 
+                                    command = result;
+                                    count++;
+                                }
+                                insertBookmark(&bookmarks, result);
+                            }
                         }
-
 
 
 
@@ -351,8 +391,8 @@ int main(void)
                         (2) the child process will invoke execv()
 						(3) if background == 0, the parent will wait,
                         otherwise it will invoke the setup() function again. */
-                        
-                        
+
+
 
             }
 
