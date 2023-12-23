@@ -22,6 +22,14 @@ in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
 
+int handleCtrlZ(int signo) {
+    if (signo == SIGTSTP) {
+        printf("\nCtrl+Z pressed. Stopping the child process.\n");
+        // Handle stopping the child process here
+        start();
+    }
+}
+
 struct Bookmark{
     char *name;
     struct Bookmark* next;    
@@ -249,6 +257,12 @@ char** split_paths(const char *str, const char *splitter, int *num_of_paths){
 
 
 int createProcess(char **PATH, int number_of_paths ,char **args, int background){
+        
+        if (signal(SIGTSTP, handleCtrlZ) == SIG_ERR) {
+            perror("signal");
+            exit(EXIT_FAILURE);
+        }
+
         int execv_return_val = 0;
         pid = fork();
 
@@ -458,8 +472,7 @@ void searchInDirectory(const char *dirPath, const char *keyword, int recursive) 
     }
 }
 
-
-int main(void){
+void start(){
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
     char *args[MAX_LINE/2 + 1]; /*command line arguments */
@@ -467,6 +480,7 @@ int main(void){
 
     while (1) {  
         printf("myshell: ");
+        fflush(stdout);
         char *PATH = getenv("PATH");
         strcat(PATH, ":.");
         background = 0;
@@ -586,10 +600,14 @@ int main(void){
             }
        }
 
-        
-
+      
         if(redirection(paths, number_of_paths, args, background)==2)
             continue;
         createProcess(paths, number_of_paths, args, background);
-    }               
+        
+    }  
+}
+
+int main(void){
+    start();
 }
