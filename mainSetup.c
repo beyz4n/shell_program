@@ -39,7 +39,7 @@ will become null-terminated, C-style strings. */
 int handleCtrlZ(int signo) {
     if (signo == SIGTSTP) {
         if(foreground == 1){
-            printf("\nCtrl+Z pressed. Stopping the child process.\n");
+            printf("\nCtrl+Z is pressed. Stopped the foreground process.\n");
             setupSignalHandler();
             main();
         }
@@ -56,7 +56,7 @@ void setupSignalHandler() {
     sa.sa_flags = SA_RESTART; // This is set to restart so that it can use the values for interrupts
 
     if (sigaction(SIGTSTP, &sa, 0) == -1) { // if action is -1, then there is an error encountered.
-        perror("sigaction");
+        fprintf(stderr, "Sigaction Error encountered \n"); 
         exit(EXIT_FAILURE);
     }
 }
@@ -126,7 +126,7 @@ void deleteBookmark(struct Bookmark **head, int index) {
 
     // if we cant find it then give error and return
     if (current == NULL) {
-        printf("Index %d is out of bounds.\n", index);
+        fprintf(stderr, "Index %d is out of bounds.\n", index);
         return;
     }
 
@@ -141,9 +141,6 @@ void deleteBookmark(struct Bookmark **head, int index) {
     // free them
     free(current->name);
     free(current);
-
-    // Return that it is deleted.
-    printf("Bookmark at index %d deleted.\n", index);
 }
 
 // This method lists the bookmarks
@@ -171,7 +168,8 @@ void argsCheck(int argsLength, char** args){
         if(!strcmp(args[i], "&")){
             args[i] = NULL;
             if(argsLength > i + 1) // also this check is for after the uppersound symbol there shouldnt be any arguments
-                printf("Please don't put arguments after &");   
+                fprintf(stderr, "Please don't put arguments after &.\n");
+
         }
     }
 }
@@ -297,7 +295,7 @@ int createProcess(char **PATH, int number_of_paths ,char **args, int background)
         pid = fork(); // fork
 
         if (pid == -1) {
-            perror("Failed to fork\n");
+            fprintf(stderr, "Failed to fork.\n"); 
         }
         if (pid == 0){ // child process
             char *temp_path = (char *)malloc(strlen("/") + strlen(args[0]) + 1); // give the path to the command
@@ -326,18 +324,18 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
             int initSTDOUT = dup(1); // save the initial state of the stdout
             fd = open(args[i+1],CREATE_FLAGS_TRUNC, 0777); // open th e file descriptor for truncate, w/ 777 permissions
             if (fd == -1) {
-                perror("Failed to open file"); // if fails give error
+                fprintf(stderr, "Failed to open file.\n"); // if fails give error
                 return 1;
             }
             dup2(fd,STDOUT_FILENO); // swap them
             if (close(fd) == -1) {
-                perror("Failed to close the file"); // close the fd
+                fprintf(stderr, "Failed to close the file.\n");  // close the fd
                 return 1;
             }
             args[i] = NULL; // make > null
             createProcess(paths, number_of_paths, args , background); // create the process
             if (dup2(initSTDOUT, 1) == -1) { // switch to original state
-                perror("dup2");
+                fprintf(stderr, "dup2 failed.\n"); 
             }
             close(initSTDOUT); // close the original state
             return 2; // return with 2
@@ -346,18 +344,18 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
             int initSTDOUT = dup(1); // save the initial state of the stdout
             fd = open(args[i+1],CREATE_FLAGS_APPEND, 0777); // open th e file descriptor for truncate, w/ 777 permissions
             if (fd == -1) {
-                perror("Failed to open file"); // if fails give error
+                fprintf(stderr, "Failed to open file.\n");  // if fails give error
                 return 1;
             }
             dup2(fd,STDOUT_FILENO); // swap them
             if (close(fd) == -1) {
-                perror("Failed to close the file"); // close the fd
+                fprintf(stderr, "Failed to close the file\n"); close the fd
                 return 1;
             }
             args[i] = NULL; // make >> null
             createProcess(paths, number_of_paths, args , background); // create the process
             if (dup2(initSTDOUT, 1) == -1) { // switch to original state
-                perror("dup2");
+                fprintf(stderr, "dup2 failed.\n"); 
             }
             close(initSTDOUT); // close the original state
             return 2; // return with 2
@@ -366,18 +364,18 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
             int initSTDIN = dup(0); // save the initial state of the stdin
             fd = open(args[i+1], O_RDONLY, 0777); // open th e file descriptor for truncate, w/ 777 permissions
             if (fd == -1) {
-                perror("Failed to open file"); // if fails give error
+                fprintf(stderr, "Failed to open file.\n"); // if fails give error
                 return 1;
             }
             dup2(fd, STDIN_FILENO); // swap them
             if (close(fd) == -1) {
-                perror("Failed to close the file"); // close the fd
+                fprintf(stderr, "Failed to close the file.\n"); // close the fd
                 return 1;
             }
             args[i] = NULL; // make < null
             createProcess(paths, number_of_paths, args , background); // create the process
             if (dup2(initSTDIN, 1) == -1) { // switch to original state
-                perror("dup2"); 
+                fprintf(stderr, "dup2 failed.\n"); 
             }
             close(initSTDIN); // close the original state 
             return 2; // return with 2
@@ -386,18 +384,18 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
             int initSTDERR = dup(2); // save the initial state of the stderr 
             fd = open(args[i+1],CREATE_FLAGS_APPEND, 0777); // open th e file descriptor for truncate, w/ 777 permissions
             if (fd == -1) {
-                perror("Failed to open file"); // if fails give error
+                fprintf(stderr, "Failed to open file.\n"); // if fails give error
                 return 1;
             }
             dup2(fd,STDOUT_FILENO); // swap them
             if (close(fd) == -1) {
-                perror("Failed to close the file"); // close the fd
+                fprintf(stderr, "Failed to close the file.\n");  // close the fd
                 return 1;
             }
             args[i] = NULL;  // make 2> null
             createProcess(paths, number_of_paths, args , background); // create the process
             if (dup2(initSTDERR, 1) == -1) { // switch to original state
-                perror("dup2");
+                fprintf(stderr, "dup2 failed.\n"); 
             }
             close(initSTDERR); // close the original state
             return 2; // return with 2
@@ -429,7 +427,7 @@ int searchInFile(const char *filePath, const char *keyword) {
     // GEt the current directory using getcwd
     char currentDir[MAX_PATH_LEN];
     if (getcwd(currentDir, sizeof(currentDir)) == NULL) {
-        perror("Error getting current directory");
+        fprintf(stderr, "Error getting current directory.\n"); 
         return EXIT_FAILURE;
     }
     // mem allocation for path name
@@ -535,7 +533,7 @@ int main(void){
                 int value = atoi(args[2]); // then make the value int
                 if(!value){
                     if(strcmp(args[2], "0")){
-                        printf("You must enter a valid number."); // check if int
+                        fprintf(stderr, "You must enter a valid number."); // check if int
                         continue;
                     }
                 }
@@ -552,7 +550,7 @@ int main(void){
                 int value = atoi(args[2]); // then make the value int
                 if(!value){
                     if(strcmp(args[2], "0")){
-                        printf("You must enter a valid number."); // check if int
+                        fprintf(stderr, "You must enter a valid number."); // check if int
                         continue;
                     }
                 }
@@ -585,7 +583,7 @@ int main(void){
         if(!strcmp(args[0], "search")){ // if the command is search
             char currentDir[MAX_PATH_LEN]; // get the current directory using getcwd method
             if (getcwd(currentDir, sizeof(currentDir)) == NULL) { 
-                perror("Error getting current directory"); // if fails
+                fprintf(stderr, "Error getting current directory.\n"); // if fails
                 return EXIT_FAILURE;
             }
             int recursive = 0;
@@ -631,7 +629,7 @@ int main(void){
                 continue;
             }
             else{ // invalid input
-                printf("Please enter y or n");
+                fprintf(stderr, "Please enter y or n.\n");
             }
        }
         // if none of these happened it may be redirection we call it
