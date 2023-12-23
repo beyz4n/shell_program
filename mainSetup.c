@@ -349,7 +349,7 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
             }
             dup2(fd,STDOUT_FILENO); // swap them
             if (close(fd) == -1) {
-                fprintf(stderr, "Failed to close the file\n"); close the fd
+                fprintf(stderr, "Failed to close the file\n"); //close the fd
                 return 1;
             }
             args[i] = NULL; // make >> null
