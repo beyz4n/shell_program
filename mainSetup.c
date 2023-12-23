@@ -29,6 +29,7 @@ pid_t pid;
 int foreground;
 
 int main(void);
+void setupSignalHandler(void);
 /* The setup function below will not return any value, but it will just: read
 in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
@@ -39,6 +40,7 @@ int handleCtrlZ(int signo) {
     if (signo == SIGTSTP) {
         if(foreground == 1){
             printf("\nCtrl+Z pressed. Stopping the child process.\n");
+            setupSignalHandler();
             main();
         }
     }
@@ -48,12 +50,12 @@ int handleCtrlZ(int signo) {
 void setupSignalHandler() {
     // Action is declared sa and is the handleCtrlZ method
     struct sigaction sa;
-    sa.sa_handler = handleCtrlZ;
-    // 
     sigemptyset(&sa.sa_mask); // makes a empty signal set
+    sigaddset(&sa.sa_mask, SIGTSTP);
+    sa.sa_handler = handleCtrlZ;
     sa.sa_flags = SA_RESTART; // This is set to restart so that it can use the values for interrupts
 
-    if (sigaction(SIGTSTP, &sa, NULL) == -1) { // if action is -1, then there is an error encountered.
+    if (sigaction(SIGTSTP, &sa, 0) == -1) { // if action is -1, then there is an error encountered.
         perror("sigaction");
         exit(EXIT_FAILURE);
     }
