@@ -21,12 +21,13 @@ pid_t pid;
 in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
+void startMain();
 
 int handleCtrlZ(int signo) {
     if (signo == SIGTSTP) {
         printf("\nCtrl+Z pressed. Stopping the child process.\n");
         // Handle stopping the child process here
-        start();
+        startMain();
     }
 }
 
@@ -379,32 +380,16 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
 }
 
 char* deleteQuotationMark(char *str) {
-    // Control bookmark string
     size_t len = strlen(str);
-    
-    if (len <= 2) {
-        // TODO: eror bastıralım
-        return;
-    }
-
-    // Bellekte yeni bir string oluştur
     char *newStr = (char *)malloc(len - 2 + 1); 
     if (newStr == NULL) {
-        // Bellek tahsisi başarısız oldu
         fprintf(stderr, "Memory allocation failed.\n");
     }
-
-    // İlk karakteri kopyala (atla)
     strncpy(newStr, str + 1, len - 2);
-
-    // Son karakteri ekle
     newStr[len - 2] = '\0';
-
-    // Orijinal string'in belleğini serbest bırak
-   if (str != NULL) {
-     free(str); 
+    if (str != NULL) {
+        free(str); 
     }
-
     return newStr;
 }
 
@@ -467,12 +452,9 @@ void searchInDirectory(const char *dirPath, const char *keyword, int recursive) 
     }
 
     closedir(dir);
-    if(isFound == 0){
-        printf("No result found.\n");
-    }
 }
 
-void start(){
+void startMain(){
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
     char *args[MAX_LINE/2 + 1]; /*command line arguments */
@@ -609,5 +591,5 @@ void start(){
 }
 
 int main(void){
-    start();
+    startMain();
 }
