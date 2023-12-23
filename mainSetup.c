@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <signal.h>
 
 
 #define CREATE_FLAGS_TRUNC (O_WRONLY | O_CREAT | O_TRUNC)
@@ -14,6 +15,8 @@
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 #define MAX_PATH_LEN 256
 #define MAX_LINE_LEN 1024
+pid_t pid;
+
 /* The setup function below will not return any value, but it will just: read
 in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
@@ -31,6 +34,7 @@ struct Bookmark* createBookmark(const char* name) {
     newBookmark->next = NULL;
     return newBookmark;
 }
+
 
 void insertBookmark(struct Bookmark **head, const char *name) {
     struct Bookmark *newBookmark = createBookmark(name);
@@ -95,6 +99,7 @@ void deleteBookmark(struct Bookmark **head, int index) {
 }
 
 void listBookmarks(struct Bookmark* head) {
+    int index = 0;
     if (head == NULL) {
         printf("No bookmarks found.\n");
         return;
@@ -102,14 +107,23 @@ void listBookmarks(struct Bookmark* head) {
 
     printf("Bookmarks:\n");
     while (head != NULL) {
-        printf("%s\n", head->name);
+        printf("%d %s\n", index, head->name);
         head = head->next;
+        index++;
     }
 }
 
+void argsCheck(int argsLength, char** args){
+    for (int i = 0; i < argsLength; i++){
+        if(!strcmp(args[i], "&")){
+            args[i] = NULL;
+            if(argsLength > i + 1)
+                printf("Please don't put arguments after &");   
+        }
+    }
+}
 
-
-void setup(char inputBuffer[], char *args[],int *background)
+void setup(char inputBuffer[], char *args[], int *background, int isBookmark)
 {
     int length, /* # of characters in the command line */
         i,      /* loop index for accessing inputBuffer array */
@@ -117,9 +131,16 @@ void setup(char inputBuffer[], char *args[],int *background)
         ct;     /* index of where to place the next parameter into args[] */
     
     ct = 0;
-        
+   
+
     /* read what the user enters on the command line */
-    length = read(STDIN_FILENO,inputBuffer,MAX_LINE);  
+    if(isBookmark){
+        length = strlen(inputBuffer) + 1; // because of null character
+    }
+    else{
+        length = read(STDIN_FILENO,inputBuffer,MAX_LINE);  
+    }   
+
 
     /* 0 is the system predefined file descriptor for stdin (standard input),
        which is the user's screen in this case. inputBuffer by itself is the
@@ -162,21 +183,37 @@ void setup(char inputBuffer[], char *args[],int *background)
                 inputBuffer[i] = '\0';
                 args[ct] = NULL; /* no more arguments to this command */
 		break;
-
+            case '\0':
+            if(isBookmark){
+                if (start != -1){
+                    args[ct] = &inputBuffer[start];     
+		    ct++;
+		}
+                inputBuffer[i] = '\0';
+                args[ct] = NULL; /* no more arguments to this command */
+            }
+        break;
 	    default :             /* some other character */
 		if (start == -1)
-		    start = i;
+		        start = i;
                 if (inputBuffer[i] == '&'){
-		    *background  = 1;
-                    inputBuffer[i-1] = '\0';
-		}
+		            *background  = 1;
+                    inputBuffer[i-1] = '\0';                    
+		        }
 	} /* end of switch */
      }    /* end of for */
      args[ct] = NULL; /* just in case the input line was > 80 */
 
-	for (i = 0; i <= ct; i++)
-		printf("args %d = %s\n",i,args[i]);
+    argsCheck(ct, args);
+
+    if(!isBookmark){
+        for (i = 0; i <= ct; i++)
+		    printf("args %d = %s\n",i,args[i]);
+    }
+
 } /* end of setup routine */
+
+
 
 
 char** split_paths(const char *str, const char *splitter, int *num_of_paths){
@@ -213,16 +250,14 @@ char** split_paths(const char *str, const char *splitter, int *num_of_paths){
 
 int createProcess(char **PATH, int number_of_paths ,char **args, int background){
         int execv_return_val = 0;
-
-        pid_t pid = fork();
+        pid = fork();
 
         if (pid == -1) {
             perror("Failed to fork\n");
         }
         if (pid == 0){ // child process
-
             char *temp_path = (char *)malloc(strlen("/") + strlen(args[0]) + 1);
-
+            printf("Child %d %d\n", background,getpid());
             strcpy(temp_path, "/");
             strcat(temp_path, args[0]);
 
@@ -233,10 +268,8 @@ int createProcess(char **PATH, int number_of_paths ,char **args, int background)
             }
         } 
         else { // parent process
-            if(background){
-                return 0; // backgroundsa çıkar beklemez
-            }else{
-                wait(NULL); // background değilse childlarını bekliyor
+            if(!background){
+                wait(NULL); // wait child process
             }
         }
     return execv_return_val;
@@ -264,7 +297,7 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
                 perror("dup2");
             }
             close(initSTDOUT);
-            break;
+            return 2;
         }
         else if(!strcmp(args[i], ">>")){
             int initSTDOUT = dup(1);
@@ -284,7 +317,7 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
                 perror("dup2");
             }
             close(initSTDOUT);
-            break;
+            return 2;
         }
         else if(!strcmp(args[i], "<")){
             int initSTDIN = dup(0);
@@ -304,7 +337,7 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
                 perror("dup2");
             }
             close(initSTDIN);
-            break;
+            return 2;
         }
         else if(!strcmp(args[i], "2>")){
             int initSTDERR = dup(2);
@@ -324,14 +357,45 @@ int redirection(char **paths, int number_of_paths ,char **args, int background){
                 perror("dup2");
             }
             close(initSTDERR);
-            break;
+            return 2;
         }
+
         i++;
     }
 }
 
+char* deleteQuotationMark(char *str) {
+    // Control bookmark string
+    size_t len = strlen(str);
+    
+    if (len <= 2) {
+        // TODO: eror bastıralım
+        return;
+    }
 
-void searchInFile(const char *filePath, const char *keyword) {
+    // Bellekte yeni bir string oluştur
+    char *newStr = (char *)malloc(len - 2 + 1); 
+    if (newStr == NULL) {
+        // Bellek tahsisi başarısız oldu
+        fprintf(stderr, "Memory allocation failed.\n");
+    }
+
+    // İlk karakteri kopyala (atla)
+    strncpy(newStr, str + 1, len - 2);
+
+    // Son karakteri ekle
+    newStr[len - 2] = '\0';
+
+    // Orijinal string'in belleğini serbest bırak
+   if (str != NULL) {
+     free(str); 
+    }
+
+    return newStr;
+}
+
+int searchInFile(const char *filePath, const char *keyword) {
+    int isFound = 0;
     FILE *file = fopen(filePath, "r");
     if (file == NULL) {
         fprintf(stderr, "Error opening file: %s\n", filePath);
@@ -347,14 +411,19 @@ void searchInFile(const char *filePath, const char *keyword) {
         // Search for the keyword in the line
         if (strstr(line, keyword) != NULL) {
             printf("%s:%d: %s", filePath, lineNumber, line);
+            if(isFound == 0){
+                isFound = 1;
+            }
         }
     }
 
     fclose(file);
+    return isFound;
 }
 
 void searchInDirectory(const char *dirPath, const char *keyword, int recursive) {
     DIR *dir = opendir(dirPath);
+    int isFound = 0;
     if (dir == NULL) {
         fprintf(stderr, "Error opening directory: %s\n", dirPath);
         return;
@@ -369,7 +438,10 @@ void searchInDirectory(const char *dirPath, const char *keyword, int recursive) 
             // Check file extension
             const char *ext = strrchr(entry->d_name, '.');
             if (ext != NULL && (strcmp(ext, ".c") == 0 || strcmp(ext, ".C") == 0 || strcmp(ext, ".h") == 0 || strcmp(ext, ".H") == 0)) {
-                searchInFile(filePath, keyword);
+                if(searchInFile(filePath, keyword)){
+                    isFound = 1;
+                }
+
             }
         } else if (recursive && entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
             // Recursive search in subdirectories
@@ -377,9 +449,13 @@ void searchInDirectory(const char *dirPath, const char *keyword, int recursive) 
             snprintf(subDirPath, sizeof(subDirPath), "%s/%s", dirPath, entry->d_name);
             searchInDirectory(subDirPath, keyword, recursive);
         }
+        
     }
 
     closedir(dir);
+    if(isFound == 0){
+        printf("No result found.\n");
+    }
 }
 
 
@@ -390,11 +466,12 @@ int main(void){
     struct Bookmark* bookmarks = NULL;
 
     while (1) {  
-        char *PATH = getenv("PATH");
-        background = 0;
         printf("myshell: ");
+        char *PATH = getenv("PATH");
+        strcat(PATH, ":.");
+        background = 0;
         /*setup() calls exit() when Control-D is entered */
-        setup(inputBuffer, args, &background);
+        setup(inputBuffer, args, &background, 0);
 
         // find the paths
         int number_of_paths = 0;
@@ -404,8 +481,6 @@ int main(void){
         // ********bookmark*********
         if(!strcmp(args[0], "bookmark")){
             if(!strcmp(args[1], "-i")){
-                // execute
-                // create process eklenecek
                 int value = atoi(args[2]);
                 if(!value){
                     if(strcmp(args[2], "0")){
@@ -415,6 +490,13 @@ int main(void){
                 }
                 struct Bookmark *neededBookmark = getBookmarkByIndex(bookmarks, value);
                 // TODO: execution will be added
+                char* command = deleteQuotationMark(neededBookmark->name);
+                setup(command, args, &background, 1);
+                printf("args after setup %s\n", args[0]);
+                redirection(paths, number_of_paths, args, background);
+                createProcess(paths, number_of_paths, args, background);
+                // TODO: setupa girmiyor debug at
+
                 continue;
             }
             else if (!strcmp(args[1], "-d")){
@@ -451,7 +533,7 @@ int main(void){
                 continue;
             }
         }
-        
+
         // *** SEARCH ***
         if(!strcmp(args[0], "search")){
             char currentDir[MAX_PATH_LEN];
@@ -464,12 +546,50 @@ int main(void){
                 recursive = 1;
                 args[1] = args[2];
             }
-            searchInDirectory(currentDir, args[1], recursive);
+
+            int keywordLen = strlen(args[1]);
+            char *keyword = (char*)malloc((keywordLen) * sizeof(char));
+            strcpy(keyword, args[1]);
+
+            char *keywordNoQuots = deleteQuotationMark(keyword);
+
+            searchInDirectory(currentDir, keywordNoQuots, recursive);
             continue;
         }
 
-        redirection(paths, number_of_paths, args, background);
-        createProcess(paths, number_of_paths, args, background);
+        // *****EXIT*****
+       if(!strcmp(args[0], "exit")){
+            pid_t childpid;
+            int status;
+            char* input;
+            childpid = waitpid(-1, &status, WNOHANG);
+            if(childpid == 0){
+                printf("There are processes still running at background.\nDou you want to terminate them? ");
+                printf("(y for 'yes', n for 'no' )\n");
 
+                scanf("%s", input);
+            }
+            else if(childpid == -1 || childpid > 0){
+                printf("There are no processes running. System exits..\n");
+                exit(0);
+            }
+            if(!strcmp(input, "y")){
+                signal(SIGQUIT, SIG_IGN);
+                if(kill(0, SIGQUIT) == 0){
+                    printf("All background processes are done. System exits..\n");
+                    exit(0);
+                }
+            }
+            if(!strcmp(input, "n")){
+                printf("Shell didn't exit\n");
+                continue;
+            }
+       }
+
+        
+
+        if(redirection(paths, number_of_paths, args, background)==2)
+            continue;
+        createProcess(paths, number_of_paths, args, background);
     }               
 }
